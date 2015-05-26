@@ -13,6 +13,7 @@ cmd:option('-endLimit',10,'maximum number of iterations with decreasing dev loss
 cmd:option('-pairSet','BH','which relation')
 cmd:option('-vecSet','g.direct','glove vectors = \'g~~\'; word2vec vectors = \'v~~\'')
 cmd:option('-printFreq',10e4,'number of iterations after which to print loss')
+cmd:option('-model','af', which model to use)
 cmdparams = cmd:parse(arg)
 
 -- Load word embeddings
@@ -21,27 +22,13 @@ emb_vocab, emb_vecs = getEmbeddings()
 
 -- Create Train and Dev sets 
 
-trainPath = table.concat({
-        '../pairs/pairs', 
-        cmdparams.pairSet,
-        '_Train.txt'
-        },"")
+trainPath = '../pairs/pairs' .. cmdparams.pairSet .. '_Train.txt'
+train = readSet(cmdparams.inputSize, trainPath) 
+train_in=train[1] ; train_out=train[2] ; trainPairs = train[3]
 
-train = readSet(cmdparams.inputSize,trainPath) 
-train_in=train[1]
-train_out=train[2]
-trainPairs = train[3]
-
-devPath = table.concat({
-        '../pairs/pairs', 
-        cmdparams.pairSet,
-        '_Dev.txt'
-        },"")
-
-dev = readSet(cmdparams.inputSize,devPath) 
-dev_in=dev[1]
-dev_out=dev[2]
-devPairs=dev[3]
+devPath = '../pairs/pairs' .. cmdparams.pairSet .. '_Dev.txt'
+dev = readSet(cmdparams.inputSize, devPath) 
+dev_in=dev[1] ; dev_out=dev[2] ; devPairs=dev[3]
 
 outPath = table.concat({
         '../params/afC_', 
@@ -59,9 +46,8 @@ outPath = table.concat({
 
 -- Define model
 
-model = nn.Sequential()
-model:add(nn.Linear(2*cmdparams.inputSize, 2))
-criterion = nn.ClassNLLCriterion()
+model = makeModel(cmdParams.model)
+criterion = ClassNLLCriterion
 
 -- Train
 
@@ -192,4 +178,20 @@ function readSet(size,path)
    
 end
 
+function makeModel(whichModel)
+	model = nn.Sequential()
+	if whichModel=='af' then
+		model:add(nn.Linear(2*cmdparams.inputSize, 2))
+	else if whichModel=='1l' then
+		model:add(nn.Linear(2*cmdparams.inputSize, 2*cmdparams.inputSize*cmdparams.hiddenFactor))
+		model.add(nn.Tanh)
+		model:add(nn.Linear(2*cmdparams.inputSize*cmdparams.hiddenFactor,2))
+	else if whichModel=='2l' then
+		model:add(nn.Linear(2*cmdparams.inputSize, 2*cmdparams.inputSize*cmdparams.hiddenFactor))
+		model.add(nn.Tanh)
+		model:add(nn.Linear(2*cmdparams.inputSize*cmdparams.hiddenFactor, 2*cmdparams.inputSize*cmdparams.hiddenFactor))
+		model.add(nn.Tanh)
+		model:add(nn.Linear(2*cmdparams.inputSize*cmdparams.hiddenFactor,2))
+	end
+end
 
