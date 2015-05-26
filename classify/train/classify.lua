@@ -3,43 +3,6 @@ require 'optim'
 require 'nn'
 require 'torchnlp'
 
-function readSet(size,path)
-    local m = torch.randn(size):zero()
-    local f =assert(io.open(path, "r"))
-
-    local pairList = {}
-    local set_in = nil
-    local set_out = nil
-
-    while true do
-        line = f:read()
-        if not line then break end
-        for hypo,hyper,label in string.gmatch(line, "(%S+)%s(%S+)%s(%S)") do
-            local vhypo = emb_vecs[emb_vocab:index(hypo)]
-            local vhyper = emb_vecs[emb_vocab:index(hyper)]
-            if vhypo~= nil and vhyper~=nil then
-
-                table.insert(pairList, hypo .. "\t" .. hyper)
-                vin = torch.cat(vhyper:typeAs(m),vhypo:typeAs(m))
-
-                if label=='0' then vout = torch.Tensor({1,0})
-                else vout = torch.Tensor({0,1}) end
-
-                if set_in ==nil then
-                    set_in = vin:clone()/vin:norm()
-                    set_out= vout:clone()
-                else
-                    set_in = torch.cat(set_in,vin/vin:norm(),2)
-                    set_out = torch.cat(set_out,vout,2)
-                end
-            end
-        end
-    end
-
-    return {set_in:t(),set_out:t(), pairList}
-   
-end
-
 -- Command line arguments
 
 cmd = torch.CmdLine()
@@ -54,19 +17,7 @@ cmdparams = cmd:parse(arg)
 
 -- Load word embeddings
 
-if cmdparams.vecSet=='g.direct' then
-    emb_dir = '/scr/kst/data/wordvecs/glove/'
-    emb_prefix = emb_dir .. 'glove.6B'
-    emb_vocab, emb_vecs = torchnlp.read_embedding(
-    emb_prefix .. '.vocab',
-    emb_prefix .. '.' .. cmdparams.inputSize ..'d.th')
-else
-    emb_dir = '/scr/kst/data/wordvecs/word2vec/'
-    emb_prefix = emb_dir .. 'wiki.bolt.giga5.f100.unk.neg5'
-    emb_vocab, emb_vecs = torchnlp.read_embedding(
-    emb_prefix .. '.vocab',
-    emb_prefix .. '.' .. cmdparams.inputSize ..'.th')
-end
+emb_vocab, emb_vecs = getEmbeddings()
 
 -- Create Train and Dev sets 
 
@@ -110,7 +61,6 @@ outPath = table.concat({
 
 model = nn.Sequential()
 model:add(nn.Linear(2*cmdparams.inputSize, 2))
-model:add(nn.Sigmoid())
 criterion = nn.ClassNLLCriterion()
 
 -- Train
@@ -195,3 +145,51 @@ for i = 1,10000 do
         print('current dev loss = ' .. dev_loss)
     end
 end
+
+function getEmbeddings()
+    emb_dir = '/scr/kst/data/wordvecs/glove/'
+    emb_prefix = emb_dir .. 'glove.6B'
+    emb_vocab, emb_vecs = torchnlp.read_embedding(
+    emb_prefix .. '.vocab',
+    emb_prefix .. '.' .. cmdparams.inputSize ..'d.th')
+    return emb_vocab, emb_vecs
+end
+
+function readSet(size,path)
+    local m = torch.randn(size):zero()
+    local f =assert(io.open(path, "r"))
+
+    local pairList = {}
+    local set_in = nil
+    local set_out = nil
+
+    while true do
+        line = f:read()
+        if not line then break end
+        for hypo,hyper,label in string.gmatch(line, "(%S+)%s(%S+)%s(%S)") do
+            local vhypo = emb_vecs[emb_vocab:index(hypo)]
+            local vhyper = emb_vecs[emb_vocab:index(hyper)]
+            if vhypo~= nil and vhyper~=nil then
+
+                table.insert(pairList, hypo .. "\t" .. hyper)
+                vin = torch.cat(vhyper:typeAs(m),vhypo:typeAs(m))
+
+                if label=='0' then vout = torch.Tensor({1,0})
+                else vout = torch.Tensor({0,1}) end
+
+                if set_in ==nil then
+                    set_in = vin:clone()/vin:norm()
+                    set_out= vout:clone()
+                else
+                    set_in = torch.cat(set_in,vin/vin:norm(),2)
+                    set_out = torch.cat(set_out,vout,2)
+                end
+            end
+        end
+    end
+
+    return {set_in:t(),set_out:t(), pairList}
+   
+end
+
+
