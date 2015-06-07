@@ -1,0 +1,26 @@
+#!/bin/bash
+exec /u/nlp/packages/scala/scala-2.11.0/bin/scala -cp /u/nlp/packages/qry/lib/qry.jar:$JAVANLP_HOME/projects/core/classes:$JAVANLP_HOME/projects/more/classes:$JAVANLP_HOME/projects/more/lib/typesafe-config-1.0.0.jar:$JAVANLP_HOME/projects/research/classes "$0" "$@"
+!#
+import Qry._  // Qry Core
+import Stanford._  // Utilities for Stanford
+
+using("/afs/cs.stanford.edu/u/nayakne/NLP-HOME/scr/tiny-lana/train/runData/")
+using("pbs")
+PBS.name     = "runTest"
+PBS.queue    = Queue.NLP
+PBS.priority = Priority.NORMAL
+PBS.cores    = 1
+
+//parallel(<# cores>)
+
+submit("torch-lua"
+  ->("twoLayers_NS.lua")
+  -("inputSize", "100")
+  -("hiddenFactor", "0.75")
+  -("learningRate", "0.05")
+  -("regCoeff", "0" & "0.001" & "0.0003" & "0.0001" & "0.00003")
+  -("negSamples", "0" & "5" & "10")
+  -("endLimit", "10")
+  -("pairSet", "EH")
+  -("printFreq", "1")
+)
